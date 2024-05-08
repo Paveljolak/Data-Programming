@@ -1,0 +1,152 @@
+---
+title: "Data Programming"
+subtitle: "Homework 2"
+author: "Pavel"
+date: April 21, 2024
+format: 
+  html:
+    embed-resources: true
+execute: 
+  warning: false
+  messages: false
+  echo: true
+  error: true
+---
+
+
+
+
+## Solutions
+
+
+Import the csv file from https://www.kaggle.com/datasets/vishnuvarthanrao/windows-store (login is required). Parse the Date column into a date.
+
+
+### Packages
+```{r}
+# Packages
+library(readr)
+library(tidyverse)
+library(lubridate) # for the dates
+library(janitor) # for cleaning names showed by professor.
+
+
+```
+
+
+```{r}
+# Initial set up
+
+data <- read.csv("./dataset/msft.csv")
+
+# Lets check what does the data look like
+as_tibble(data)
+
+# The formatting of the dates is different that what we want, so we have to 
+# reformat it.
+# Easy fix with lubrydate
+data$Date <- as.Date(data$Date, format = "%d-%m-%Y")
+
+
+head(as_tibble(data))
+# Now that the date columns is properly formatted we put it in the variable
+
+date <- data$Date
+head(date)
+
+```
+
+
+
+
+### 1. 
+Display the dataframe as a tibble.
+```{r}
+
+# 1 Display the dataframe as a tibble.
+as_tibble(data)
+
+```
+
+
+### 2.
+
+How long has the data been collected?
+```{r}
+# 2 How long has the data been collected?
+
+# find the earliest day
+earliestDay <- min(date, na.rm = T)
+# find the lates day
+latestDay <- max(date, na.rm = T)
+
+earliestDay
+latestDay
+  
+# take the difference between them  
+collectionTime <- difftime(latestDay, earliestDay)
+
+# data has been collected for
+collectionTime
+
+```
+
+
+### 3.
+Among the highest rated apps return the 10 apps (rows) with the highest amount of reviews. Display only the first 3 columns.
+```{r}
+
+# 3 Among the highest rated apps return the 10 apps 
+# (rows) with the highest amount of reviews. Display only the first 3 columns.
+head(data$Rating)
+
+# uses janitor package introduced by professor, we don't have to use it, but its nice
+highestRatedApps <- data %>%
+  clean_names() %>%
+  filter(rating == max(rating, na.rm = TRUE)) %>%
+  .[order(-.$no_of_people_rated), 1:3] %>%
+  head(10)
+highestRatedApps
+
+```
+
+
+### 4.
+Show the number of apps created per month.
+```{r}
+
+# 4 Show the number of apps created per month.
+
+appsPerMonth <- data %>%
+  clean_names %>%
+  group_by(month = format(date, "%m")) %>%
+  summarise(numOfApps = n_distinct(name))
+
+appsPerMonth
+
+
+tAppsPerMonth <- t(appsPerMonth)
+tAppsPerMonth <- as.data.frame(tAppsPerMonth)
+rownames(tAppsPerMonth) <- NULL
+colnames(tAppsPerMonth) <- NULL
+
+
+tAppsPerMonth
+
+```
+
+
+### 5.
+Sort the rows of the dataframe from the least wordy to most wordy app name. Display the first 15.
+```{r}
+
+# 5 Sort the rows of the dataframe from the least wordy to most wordy app name. 
+# Display the first 15.
+head(data$Name)
+
+
+sortedWordyness <- data[order(nchar(data$Name)), ]
+head(sortedWordyness, 15)
+
+```
+
