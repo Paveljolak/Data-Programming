@@ -1,0 +1,301 @@
+
+---
+title: "Exam September 2022 (90 min)"
+author: "Name Surname"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning = FALSE, error=TRUE)
+
+```
+
+## Introduction
+
+Solve the problems, knit markdown into an html file and upload it to e-classroom. Set up Rmarkdown in such a way that both the code and output are visible, however hide all warnings and messages. Also set it up so that html is created regardless if errors are present. If given sample data to work with, your solutions need to be scalable to larger examples.
+
+Good luck!
+
+
+## Packages
+
+```{r}
+# Packages:
+
+library(tidyverse)
+library(readxl)
+library(lubridate)
+
+
+```
+
+
+## Problem 1
+
+You are given a data.frame with some events and their dates. Sort the rows from the earliest to the latest! 
+
+
+```{r}
+p1<-data.frame(Event=c("World cup","Ozivela ulica","Euro Math Congress","Summer school Rogla","Final exams","HL3 release date"),Year=c(2022,2021,2004,2022,1999,2077),Day=c(11,2,30,14,5,6),Month=c(12,3,4,7,10,10),stringsAsFactors=F)
+p1
+```
+```{r}
+p1 %>% mutate(Date = ydm(paste(Year, Day, Month))) %>% arrange(Date) %>% .[,-(ncol(p1)+1)]
+
+
+# Peter's solution:
+p1 %>% mutate(Date=dmy(paste(Day, Month, Year))) %>%
+  arrange(Date)
+
+# He here shows the Date column as well. I thought 
+# its nicer if we do not show that column.
+
+```
+
+
+
+## Problem 2
+
+Write a function, that given a data.frame, it returns the data.frame with only columns that do not contain any NA values. Run your function on the data.frame **airquality**.
+
+```{r}
+
+noNa <-\(df){df %>% {.[,!(grepl("NA", .[,1:length(df)]))]}}
+
+
+airquality -> df1
+
+noNa(df1)
+
+# Peter's solution:
+
+rm_na_col <-\(df){df %>%
+    lapply(\(x){!is.na(max(x))}) %>% unlist %>% 
+    df[,.]}
+
+
+rm_na_col(airquality)
+         
+
+  
+
+```
+
+
+
+
+
+## Problem 3
+
+Create a data.frame with the following columns: 
+ID, FirstName, LastName, Address. The values are to be taken from the given text.
+
+
+```{r}
+p3<-"P0001 Julie Zion 6754 Lakeview Dr. Coral Springs
+P0002 Britta Zarinsky 4532 Maplewood Dr. Coral Springs
+P0003 Jenna Moldof 100 Oak Lane Coral Springs
+P0004 Melissa Kimble 1101 Ramblewood Rd. Coral Springs
+P0005 Jessica Anderson 1345 University Dr. Coral Springs
+P0006 Leslie Ericson 8922 Coral Ridge Dr. Coral Springs
+P0007 Jessica Goodman 3800 Westview Dr. Coral Springs
+P0008 Marci Barber 4545 Westview Dr. Coral Springs
+P0009 Nancy Dorman 900 Ramblewood Rd Coral Springs
+P0010 Julie Fraser 4566 Parkside Dr. Coral Springs
+P0011 Kelly James 800 Coral Springs Dr. Coral Springs
+P0012 Sherrie Green 6600 Main Street Coral Springs
+P0013 Priscilla Pearson 2450 Maplewood Dr. Coral Springs
+P0014 Kerri Stone 550 Sample Road Coral Springs
+P0015 Toni Moldof 522 Coral Springs Dr. Coral Springs
+P0016 Shelly Parker 1001 Coral Ridge Dr. Coral Springs
+P0017 Amy Kinzer 922 Sample Road Coral Springs
+P0018 Mary Citron 500 Oak Lane Coral Springs
+P0019 Jessica Grauer 1881 Vestal Road Coral Springs
+P0020 Sonja Freed 2210 Main Street Coral Springs
+P0021 Lori Pryor 2001 Parkside Dr. Coral Springs
+P0022 Lauren Howard 1520 University Dr. Coral Springs
+P0023 Katie Remmen 2200 Cedarwood Dr. Coral Springs
+P0024 Katherine Akong 1705 Ramblewood Dr. Coral Springs
+P0025 Lilly Taboas 1025 Coral Springs Dr. Coral Springs"
+
+
+p3 %>% str_split("\n") %>% unlist %>% data.frame(A=.) -> p3.1
+
+p3.1%>% 
+  separate(1, c("ID", "Name", "Surname", "Address"), extra="merge")
+
+
+
+
+
+
+
+
+
+p3 %>% str_split("\n") %>% unlist %>% 
+  data.frame(Strings = .) -> p3.2
+
+p3.2 %>% 
+  separate(Strings, c("ID", "FirstName", "LastName", "Address"), extra="merge", sep = " ")
+ 
+
+```
+
+
+
+
+
+## Problem 4
+
+You are given a list of data.frames. Return a (named) vector with the maximum of every numeric column. The names of the elements should equal the respective column names. Omit non-numeric columns from the output. 
+
+```{r}
+p4<-list(mtcars,iris,airquality)
+
+
+p4 %>%
+  lapply(\(x){summarise_if(x, is.numeric, max, na.rm=T)}) %>%
+  unlist
+
+
+```
+
+
+
+
+
+
+
+## Problem 5
+
+In the attached file **OrderDatabase.xlsx** there are 3 worksheets, each containing a data.frame.
+What is the total revenue of items ordered on 3.3.2006?
+```{r}
+
+dir(pattern = "Order", recursive = T) -> filename
+
+filename %>% 
+  excel_sheets() %>% 
+  sapply(\(x){read_excel(filename, sheet = x)}) -> L
+
+
+L$stock%>% colnames()
+
+
+L$orders %>% inner_join(L$orderline,
+                        by=c("OrderID"="OrderID")) %>% 
+  inner_join(L$stock, by=c("StockID"="StockID")) %>% 
+  select(c(OrderID, OrderDate, Description, Qty, UnitCost)) %>% 
+  .[grepl("2006-03-03",.$OrderDate),] %>%
+  mutate(Revenue = Qty * UnitCost) %>% 
+  group_by(Description) %>% summarise(Revenue = sum(Revenue))
+
+
+
+# Pete's solution
+L$orders %>% inner_join(L$orderline,
+                        by=c("OrderID"="OrderID")) %>% 
+  inner_join(L$stock, by=c("StockID"="StockID")) %>% 
+  select(OrderDate, Qty, UnitCost) %>% 
+  filter(as.character(OrderDate)=="2006-03-03") %>% 
+  summarise(TotalRevenue = sum(Qty*UnitCost))
+  
+  
+# Ok basically he took the total revenue and used 
+# filter.
+
+# I took the revenue per item. But I guess the task is
+# to take the total revenue.
+# Also note to self: use the filter function when 
+# wanting to grab rows.
+```
+
+
+
+
+
+
+## Problem 6
+
+Given the data.frame **tidyr::billboard**, show the 5 most used words in the song names along with their counts (combinations like "Can't" count as 1 word for this problem).
+```{r}
+billboard %>%
+  .$track %>%
+  str_split(" ") %>%
+  unlist %>%
+  factor %>% 
+  summary %>% 
+  head(5)
+
+
+# Peter's solution:
+billboard %>% 
+  .$track %>% 
+  str_split("[^'A-Za-z0-9]+") %>% 
+  unlist() %>% 
+  factor() %>%
+  summary() %>% 
+  .[2:6]
+
+
+# Very similar solutions: 
+# He is using different pattern for matching and he gets more
+# words for that reason. Idk what happened but i guess it is
+# what it is
+
+
+```
+
+
+
+
+
+## Problem 7
+
+You are given the data.frame about the Titanic at https://vincentarelbundock.github.io/Rdatasets/csv/COUNT/titanic.csv
+, a passenger ship that sunk in 1912. Investigate whether "women and children" were indeed given priority compared to "men" among the passengers when it came to the rescue. Plot with a histogram of the four groups (each combination of age and sex), showing the percentage of survivors among the population of that group.
+
+```{r}
+read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/COUNT/titanic.csv") -> df7
+
+
+# We first need to make percentage column
+df7 %>% select(age:survived) %>% group_by(age, sex) %>% 
+  summarise(Total=n(), Yes=sum(survived=="yes")) %>% 
+  unite("AS", age:sex) %>% 
+  mutate(PercentSurvived=Yes/Total*100)-> df7.1
+
+
+# Then we plot it:
+
+df7.1 %>% ggplot() +
+  aes(x=AS, weight=PercentSurvived) +
+  geom_bar() + 
+  labs(
+    x = "group",
+    y= "survivalRate",
+    title = "Titanic Survival Rate per Group"
+  )
+  
+  
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
