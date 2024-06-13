@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning = FALSE, error=TRUE)
 ## Introduction
 
 Solve the problems, knit markdown into an html file and upload it to e-classroom. Set up Rmarkdown in such a way that both the code and output are visible, however hide all warnings and messages. Also set it up so that html is created regardless if errors are present. If given sample data to work with, your solutions need to be scalable to larger examples.
-
++
 Good luck!
 
 

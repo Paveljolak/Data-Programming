@@ -1,0 +1,190 @@
+---
+title: "Exam Data Programming (90 min)"
+author: "First and Last name"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+  toc: yes
+toc_float: yes
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning = FALSE, error=TRUE)
+
+```
+
+## Introduction
+
+Before submitting, knit your solutions into an html file, where both the code and its result are visible. Other forms of submission will be rejected! 
+
+
+##Packages:
+```{r}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(janitor)
+```
+
+  
+## Problem 1 (3 points)
+  
+Generate 100 **integers** between -40 and 40 at random. Show the distribution of the values with a histogram. The histogram should have the title "Distribution of random values".  
+
+```{r}
+runif(100, -40, 41) %>% floor -> v1
+
+data.frame(v1) -> df1
+
+df1 %>% ggplot +
+  aes(x = v1) +
+  geom_histogram() +
+  labs(
+    x = "Random Values",
+    y = "Count",
+    title = "Distribution of random values"
+  )
+
+
+# Peter's Solution:
+sample(-40:40, 100, replace = T) %>% 
+  data.frame(Val=.) %>% 
+  group_by(Val) %>% 
+  summarise(Count= n()) -> df1.1
+
+
+df1.1 %>% ggplot() + aes(x=Val, weight=Count) +
+  geom_bar() +
+  labs(
+    x = "Random Values",
+    y = "Count",
+    title = "Distribution of random values")
+
+
+```
+
+  
+## Problem 2 (3 points)
+
+Generate 1000 **integers** between 1 and 10000 at random. How many of them are odd and how many are even?
+```{r}
+
+sample(1:10000, 1000) %>% 
+  data.frame(nums = .) %>% 
+  filter(.$nums%%2 == 0)
+
+
+# Peter's solution: 
+sample(1:10000, 1000, replace = T) %>%
+  {c(Odd=sum(.%%2), Even=sum(((.+1)%%2)))}
+
+
+# So basically he did somehing weird for the even
+# idk idc. 
+# Note to self: Do not forget replace = T when sampling.
+
+# Try 2:
+sample(1:10000, 1000, replace = T) %>% 
+  {c(Odd=sum(. %% 2==1), Even=(sum(. %% 2 == 0)))}
+
+# Since . %% 2 == 1 will give us a vector of 
+# true where the value is odd, and false where the 
+# value is even, we can sum it up to get the final 
+# number of odd values.
+
+# Same for even, to get the even values. 
+# We can also subtract the full length of the vector
+# - odd or - even to get the even, odd respectively
+
+```
+
+
+
+## Problem 3 (5 points)
+
+By use of the built-in vector "letters" generate a word with 50 letters. The word must not be made of a single letter. Show the frequency of each letter in the word with a histogram.
+```{r}
+sample(letters, 50, replace = T) %>% 
+  paste(collapse = "") -> tmp
+
+
+tmp %>% str_split("") %>% unlist %>% 
+  factor %>% summary %>% data.frame(Let = .) -> df3
+
+df3$Name <- rownames(df3)
+
+df3 %>% group_by(Name) %>% mutate(Frequency = Count/50*100) -> df3.2
+  
+  
+ colnames(df3)[1] <- "Count"
+
+ggplot(df3) + aes(x = Count, y = Name) +
+  geom_bar()
+  
+  
+
+
+ggplot(df3) +
+  aes(y = Count, x = Name) +
+  geom_bar(stat = "summary", fun = "sum" )
+
+
+
+# Final try before going to bed:
+ggplot(df3.2) +
+  aes(x = Frequency, y = Name) +
+  geom_bar(stat = "summary") +
+  labs(
+    y = "Letter",
+    title = "Frequency of letters in the word."
+  )
+  
+  
+```
+
+
+## Problem 4 (3 points)
+
+Convert the below data.frame grade from its "wider" form to a "longer" form by use of the function pivot_longer, where the columns names "math" and history" are saved into a column named "course" and the grades into a column named "grade".
+
+```{r}
+grades <- data.frame(names = c("John", "Juan", "Jean", "Yao"), 
+                     math = c(95, 80, 90, 85), 
+                     history = c(90, 85, 85, 90))
+```
+
+## Problem 5 (5 points)
+
+Install the package library("dslabs") and load it into memory. This will allow you access the data.frame murders. Use the tidyverse library and answer the following questions. 
+
+1. For each region, what is the percentage of murders in that region with respect to the region population? Arrange the results in descending order of percentages. 
+
+2. What is the percentage based on the first letter of the regions? (same question but longer: For each letter of the alphabet, what is the percentage of murders in regions that start with this letter with respect to the population of regions that start with this letter?)
+  
+## Problem 6 (4 points)
+  
+ Extract from the text below, using regular expressions.
+  
+  \- Get all of the names.
+  
+  \- Get all of the numbers.
+
+```{r}
+
+text<-"Drew has 3 watermelons, Shawn has 4 hamburgers, Karina has 12 tamales, and Anna has 6 soft pretzels"
+
+```
+
+## Problem 7 (3 points)
+
+What is the time difference, in days, between the below dates?
+  
+```{r}
+x <- "11 th april 2012"
+y <- "April 24th 2018 11:59:59"
+```
+
+## Problem 8 (4 points)
+
+Create a function, that given an integer vector, returns another vector that contains only integers 0-9 and only those that do **not** appear as the last digit of any of the input numbers.  For example, given input X=10 22 34 148, the function returns 1 3 5 6 7 9.
+
