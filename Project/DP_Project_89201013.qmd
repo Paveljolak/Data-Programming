@@ -1,0 +1,578 @@
+---
+title: "Analyzing Shelter Datas"
+subtitle: "Data Programming Project"
+author: "Pavel"
+date: "`r format(Sys.time(), '%e %B %Y')`"
+bibliography: "./library.bib"
+toc: true
+format: 
+  html:
+    embed-resources: true
+execute: 
+  warning: false
+  messages: false
+  echo: true
+  error: true
+---
+
+# Extensive Analysis for Animal Intakes and Outcomes in Animal Shelters
+
+## Problem Definition
+Animal shelters play a critical role in providing care and finding homes for abandoned, stray, and sick animals. However, managing the vast number of animals that come through their doors presents numerous challenges. These challenges include: 
+
+* Resource allocation,
+* Health Care,
+* Ensuring Adoption Rates while Minimizing Euthanasia.
+
+The primary problem addressed in this project is to analyze and understand the patterns in animal intake, health conditions, and outcomes within a shelter. The aim is help the animal shelter by identifying the common reasons for animal intake, the conditions upon arrival, and the factors influencing their eventual outcomes. Then the shelters can improve their operations, enhance animal welfare, and increase the efficiency of their adoption programs. This analysis is essential for developing data-driven strategies to optimize shelter resources, improve animal health and behavior interventions, and ultimately ensure more animals find permanent, loving homes.
+
+
+## Data Sets used
+Initially the dataset used for this project was found on kaggle: [@kaggleData].
+The author was Jack Daoud. But uppon further inspection it was 3 years old data. So, by following the links the updated version of the datasets were found.
+
+* Intakes dataset: [@intakesData]
+
+* Outcomes dataset: [@outcomesData]
+
+More information regarding the datesets is provided in the following sections.
+
+
+## Data Collection and Cleaning
+
+### Packages used
+```{r}
+# Packages:
+library(tidyverse)
+library(janitor)
+library(knitr)
+
+
+```
+
+
+### Data Collection
+#### Reading the data:
+```{r}
+# Reading the data:
+dir(pattern = "Austin", recursive = T)[1] -> filename1
+dir(pattern = "Austin", recursive = T)[2] -> filename2
+
+filename1 %>% read.csv() -> intakesDF
+filename2 %>% read.csv() -> outcomesDF
+
+
+
+```
+#### Exploring the data:
+```{r}
+# Exploring the data:
+intakesDF %>% colnames
+outcomesDF %>% colnames
+```
+### Data Cleaning
+
+We are working with overlapping datasets: one for the intake of animals into the shelter and another for their outcomes.
+
+Intakes dataset: 
+
+* **Animal.ID**: Unique identifier for each animal.
+* **Name**: Name given to the animal, if available.
+* **DateTime**: Date and time of the intake event.
+* **MonthYear**: Month and year of the intake event.
+* **Found.Location**: Location where the animal was found or brought in.
+* **Intake.Type**: Type of intake event (e.g., Stray, Owner Surrender).
+* **Intake.Condition**: Condition of the animal upon intake (e.g., Normal, Injured).
+* **Animal.Type**: Type of animal (e.g., Dog, Cat).
+* **Sex.upon.Intake**: Sex and sterilization status of the animal upon intake.
+* **Age.upon.Intake**: Age of the animal upon intake (e.g., "2 years", "3 months").
+* **Breed**: Breed or breed mix of the animal.
+* **Color**: Color or color pattern of the animal.
+
+Outcomes dataset:
+
+* **Animal.ID**: Unique identifier for each animal.
+* **Name**: Name given to the animal, if available.
+* **DateTime**: Date and time of the outcome event.
+* **MonthYear**: Month and year of the outcome event.
+* **Date.of.Birth**: Date of birth of the animal.
+* **Outcome.Type**: Type of outcome event (e.g., Adoption, Transfer).
+* **Outcome.Subtype**: Further categorization of the outcome type (if available).
+* **Animal.Type**: Type of animal (e.g., Dog, Cat).
+* **Sex.upon.Outcome**: Sex and sterilization status of the animal at the time of outcome.
+* **Age.upon.Outcome**: Age of the animal at the time of outcome (e.g., "2 years", "3 months").
+* **Breed**: Breed or breed mix of the animal.
+* **Color**: Color or color pattern of the animal.
+
+
+Here we determine the range of dates covered by our datasets:
+
+The intake animals from date:
+```{r}
+intakesDF %>% select(DateTime) %>% .[1,]
+```
+
+Until date: 
+```{r}
+intakesDF %>% select(DateTime) %>% {.[nrow(.),]}
+```
+
+The outcome of animals from date:
+```{r}
+outcomesDF %>% select(DateTime) %>% .[1,]
+```
+
+Until date: 
+```{r}
+outcomesDF %>% select(DateTime) %>% {.[nrow(.),]}
+```
+
+We can see that the timing of the two datasets does not overlap. However, there is a significant overlap in the animals included in both datasets. We can use this overlap to join the datasets and focus exlusively on animals that have recorded outcomes.
+
+This provides us with the opportunity to exclude the information we do not wish to retain:
+```{r}
+
+intakesDF %>%
+  clean_names %>%
+  select(animal_id,
+         name, 
+         date_time,
+         intake_type,
+         intake_condition,
+         animal_type,
+         sex_upon_intake,
+         age_upon_intake,
+         breed,
+         color) -> intakesForJoinDF
+  
+outcomesDF %>%
+  clean_names %>%
+  select(animal_id,
+         date_time,
+         date_of_birth,
+         outcome_type,
+         outcome_subtype) -> outcomesForJoinDF
+
+```
+
+There are duplicate values in the 'animal_id' column, that means some animals were recorded multiple times. To solve this, we will omit duplicates and only work with a single record for each animal.
+```{r}
+# Checking if there are some duplicate values in the intakes dataset:
+intakesForJoinDF$animal_id %>% length
+intakesForJoinDF$animal_id %>% unique %>% length
+
+# Checking if there are some duplicate values in the outcomes dataset:
+outcomesForJoinDF$animal_id %>% length
+outcomesForJoinDF$animal_id %>% unique %>% length
+
+# Cleaning the duplicate values in the intakes dataset:
+intakesForJoinDF %>% distinct(animal_id, .keep_all = T) -> intakesForJoinDF
+intakesForJoinDF$animal_id %>% length
+
+# Cleaning the duplicate values in the outcomes dataset:
+outcomesForJoinDF %>% distinct(animal_id, .keep_all = T) -> outcomesForJoinDF
+outcomesForJoinDF$animal_id %>% length
+
+```
+
+Now, we will resolve the issue of columns that share the same name:
+```{r}
+intakesForJoinDF %>% colnames
+
+colnames(intakesForJoinDF)[3] <- "date_time_intake"
+
+
+outcomesForJoinDF %>% colnames
+
+colnames(outcomesForJoinDF)[2] <- "date_time_outcome"
+```
+
+Now that the two dataframes are ready we can join them:
+```{r}
+# The two data frames are now ready to be joined:
+intakesForJoinDF %>%
+  inner_join(outcomesForJoinDF, by = "animal_id") -> joined1
+
+joined1 %>% head %>% kable() 
+```
+
+We will be working with this dataframe for the rest of the project.
+
+
+## Data Analysis
+
+### Initial Analysis
+We can see some quick analytics from this data:
+
+1. We can see how many animals, that were taken by the shelter, reached some outcome:
+```{r}
+intakesForJoinDF %>% nrow -> numberOfIntake
+joined1 %>% nrow -> numberOfOutcomes
+
+
+numberOfOutcomes / numberOfIntake * 100
+```
+
+We can see that 99% of the animals taken by the shelter reached some kind of outcome.
+
+```{r}
+joined1 %>% .$outcome_type %>% factor %>% summary -> outcome_summary
+outcome_summary %>% names
+```
+The outcomes can be:
+
+- **Adoption**: Animals were adopted and placed into new homes.
+- **Died**: Animals passed away while in the shelter.
+- **Disposal**: Animals were disposed of, typically due to medical reasons or at the owner's request.
+- **Euthanasia**: Animals were euthanized, often due to health or behavioral issues.
+- **Lost**: Animals went missing from the shelter.
+- **Missing**: Indicates animals were reported missing while in the shelter's care.
+- **Relocate**: Animals were relocated to another location or shelter.
+- **Return to Owner**: Animals were successfully returned to their owners.
+- **Rto-Adopt**: Animals were returned to the shelter temporarily with the intent of adoption.
+- **Stolen**: Indicates animals were reported stolen from the shelter.
+- **Transfer**: Animals were transferred to another organization or facility.
+
+2. We can see how many of the animals were actually adopted:
+```{r}
+outcome_summary[c("Adoption", "Return to Owner", "Rto-Adopt")] %>% sum -> totalAdopted
+
+
+totalAdopted / numberOfIntake * 100 
+
+```
+
+We can see that 60% of the animals that reached an outcome were actually adopted.
+
+```{r}
+
+outcome_summary[c("Died", "Euthanasia")] %>% sum -> fatalOutcome
+fatalOutcome / numberOfIntake * 100
+```
+
+We can see that close to 8% of the animals that were taken by the animal shelter had a fatal outcome.
+
+```{r}
+outcome_summary["Died"] %>% sum %>% {. / fatalOutcome * 100} 
+```
+
+Out of which 13% died on their own.
+
+```{r}
+outcome_summary["Euthanasia"] %>% sum %>% {. / fatalOutcome * 100}
+```
+
+And the other 87% were euthanized by the shelter. We will explore the reason for euthanasia in one of the following sections.
+
+
+### Intake type
+Now we want to determine which animals have been admitted to the shelter and their respective conditions at intake.
+
+```{r}
+
+joined1 %>%
+  group_by(intake_type) %>%
+  summarize(count = n()) %>% 
+  arrange(desc(count)) -> intakeTypeCounts
+intakeTypeCounts %>%  as.tibble()
+
+
+```
+The intake types data [-@fig-IntakeType] categorizes the reasons for animals entering the shelter:
+
+* **Stray**: The most common intake type, accounting for 102,747 animals, indicating animals found or brought in without a known owner.
+
+* **Owner Surrender**: 27,316 animals were surrendered by their owners, reflecting situations where owners could no longer care for their pets.
+
+* **Public Assist and Wildlife**: 8,127 animals entered with public assistance, and 6,165 were wildlife, illustrating community involvement and wildlife conservation efforts.
+
+* **Abandoned**: 1,468 animals were abandoned, highlighting issues of neglect or abandonment by owners.
+
+* **Euthanasia Request**: A smaller number (248 animals) were brought in specifically for euthanasia at the owner's request, indicating end-of-life care situations.
+
+
+To graphically show the information above we can plot it:
+```{r}
+#| label: fig-IntakeType
+#| fig-cap: "Count of Animals given their Intake Type"
+
+# Intake Type:
+ggplot(intakeTypeCounts) +
+  aes(x = count, y = intake_type) +
+  labs(
+    x = "Count of Animals",
+    y = "Intake Type",
+    title = "Count of animals given their Intake Type"
+  ) +
+  geom_bar(stat = "summary", fun = "sum", fill = "#112446") +
+  theme_minimal() 
+
+
+```
+
+
+
+```{r}
+joined1 %>%
+  group_by(intake_condition) %>%
+  summarize(count = n()) %>% 
+  arrange(desc(count)) -> intakeConditionCounts
+intakeConditionCounts %>% as.tibble %>% head(10)
+
+```
+The intake conditions data [-@fig-IntakeConditions] provides information of the health and status of animals upon admission to the shelter:
+
+* **Normal**: The most frequent condition observed in intake, with 122,952 animals entering the shelter in normal health.
+
+* **Injured**: A significant number of animals (9,308) were admitted due to injuries, requiring immediate care.
+
+* **Sick**: 7,041 animals were brought in due to illness, indicating a need for medical attention upon intake.
+
+* **Nursing and Neonatal**: 3,824 animals were nursing, and 1,384 were neonatal, highlighting the presence of mother animals and very young offspring.
+
+* **Aged and Medical**: Smaller numbers of animals were aged (470) or had specific medical conditions (337) requiring attention upon intake.
+
+* Other conditions such as **Behavior**, **Med Attn**, and **Unknown** were less frequently reported, each comprising fewer cases.
+
+```{r}
+#| label: fig-IntakeConditions
+#| fig-cap: "Count of Animals given their Intake Condition"
+
+
+# Intake Condition:
+ggplot(intakeConditionCounts) +
+  aes(x = count, y = intake_condition) +
+  geom_bar(stat = "summary", fun = "sum", fill = "#112446") +
+  labs(
+    x = "Count of Animals",
+    y = "Intake Condition",
+    title = "Count of animals given their Intake Condition"
+  ) +
+  theme_minimal() 
+```
+
+
+### Health of animals upon outcome compared to intake
+We will now select animals that were categorized as injured or sick and analyze their outcomes to assess the level of care they received during their stay in the shelter:
+
+```{r}
+joined1 %>%
+  filter(intake_condition == "Sick" | intake_condition == "Injured") -> sickInjuredAnimals
+
+sickInjuredAnimals %>% head %>% kable
+
+```
+
+Now we can just use the outcome type to visualize the data:
+```{r}
+sickInjuredAnimals %>%
+  filter(!is.na(intake_condition)) %>%
+  group_by(intake_condition, outcome_type) %>%
+  summarize(count = n()) -> careAnalysis
+
+```
+
+```{r}
+#| label: fig-OutcomesPerCondition
+#| fig-cap: "Outcomes Based on Intake Condition"
+
+ggplot(careAnalysis, aes(x = outcome_type, y = count, fill = intake_condition)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    x = "Outcome Type",
+    y = "Count",
+    title = "Outcomes Based on Intake Condition"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+From the plot: [-@fig-OutcomesPerCondition] we can see that most of the injured animals were adopted, but majority of sick animals were either transferred to a different facility or have been euthanized.  
+
+### Reason for Euthanisation
+In this section we will delve deeper into the reason for euthanization.
+
+```{r}
+
+euthanasia_reasons <- sickInjuredAnimals %>%
+  filter(outcome_type == "Euthanasia") %>%
+  select(animal_id, name, animal_type, intake_condition, outcome_subtype)
+
+euthanasia_reasons %>%
+  group_by(outcome_subtype) %>%
+  summarize(count = n()) %>% 
+  arrange(desc(count)) 
+
+```
+From the dataframe and the plot [-@fig-EuthanasiaReason], it is evident that the primary reasons for euthanization of animals are **Suffering** (2762 cases) and **Rabies Risk** (1657 cases). Additionally, animals euthanized due to **Medical** reasons constitute a smaller proportion compared to the first two (247). Other reasons such as euthanization **At Vet** (159), animals being **Aggressive** (20), them having **Behavior** issues (13), being **Underage** to survive (2) or having **Court/Investigation** decision to be euthanized (1). There are also some cases that have **Unknown** outcome (137).
+
+
+
+```{r}
+#| label: fig-EuthanasiaReason
+#| fig-cap: "Reasons for Euthanasia of Animals"
+
+
+ggplot(euthanasia_reasons, aes(x = outcome_subtype)) +
+  geom_bar() +
+  labs(
+    x = "Reason for Euthanasia",
+    y = "Count",
+    title = "Reasons for Euthanasia of Animals"
+  ) +
+  theme_gray() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+
+
+### Animals Euthanised per Type
+In this section we will see which types of animals were euthanized the most.
+```{r}
+euthanasia_reasons %>%
+  group_by(animal_type) %>%
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+```
+Given the information above we can observe the distribution of euthanized animals per type. The majority of euthanized animals belong to the category labeled as **Other** (2564 cases). This represents animals for which the shelter does not specify the type. They are followed by **Cat** (1536 cases) and **Dog** (743 cases). **Birds** are accounted for a smaller proportion (117 cases), while **Livestock** had the least occurrences (2 cases).
+
+
+### Euthanasia Comparison between Cats and Dogs
+In this section we will see the main reasons for euthanization of Dogs and Cats.
+
+```{r}
+euthanasia_reasons %>%
+  filter(animal_type == "Dog" | animal_type == "Cat", !is.na(outcome_subtype) & outcome_subtype != "") %>%
+  group_by(animal_type, outcome_subtype) %>%
+  summarize(count = n()) %>%
+  arrange(animal_type, desc(count)) -> euthanasiaCatsDogs
+
+
+  euthanasiaCatsDogs %>%
+  as.tibble() %>%
+  group_by(animal_type) %>%
+  arrange(animal_type, desc(count))
+
+```
+
+**Suffering** is the leading reason for euthanasia in both cats and dogs, with cats having a significantly higher number of cases compared to dogs.
+
+- **Cats**: 1,314 cases
+- **Dogs**: 598 cases
+
+Even though there are more Dogs recorded than Cats. (75926 Dogs to 60825 Cats.)
+
+Euthanasia while under veterinary care (**At Vet**) is more frequent among cats than dogs.
+
+- **Cats**: 92 cases
+- **Dogs**: 45 cases
+
+**Rabies** risk as a reason for euthanasia is more common among cats than dogs, indicating higher incidence or risk factors related to rabies in cats.
+
+- **Cats**: 70 cases
+- **Dogs**: 23 cases
+
+
+**Medical** reasons for euthanasia are comparable between cats and dogs, reflecting severe health conditions or injuries that require human intervention.
+
+- **Cats**: 49 cases
+- **Dogs**: 42 cases
+
+Euthanasia due to aggression (**Aggressive** behavior) is predominantly seen in dogs, highlighting behavioral issues that pose risks to public safety or the welfare of other animals.
+
+- **Cats**: 1 case
+- **Dogs**: 18 cases
+
+We can visualize this information in the next plot [-@fig-EuthanasiaDogsCats]:
+
+```{r}
+#| label: fig-EuthanasiaDogsCats
+#| fig-cap: "Reasons for Euthanasia between Cats and Dogs"
+
+
+colors <- c("Cat" = "#FF0000", "Dog" = "#1f78b4")
+
+ggplot(euthanasiaCatsDogs) +
+  aes(x = animal_type, y = count, fill = animal_type) +
+  geom_bar(stat = "summary", fun = "sum") +
+  scale_fill_manual(values = colors) + 
+  labs(
+    x = "Type of Animal",
+    y = "Count",
+    title = "Reasons for Euthanasia between Cats and Dogs",
+    fill = "Type of Animal"
+  ) +
+  theme_gray() +
+  facet_wrap(vars(outcome_subtype))
+```
+
+This comparison shows that while suffering and medical condition are prominent reasons for euthanasia across both cats and dogs, there are notable differences in the frequencies of specific reasons. Specific reasons as rabies risk and aggression. Understanding the differences helps to improve the interventions and improve welfare outcomes.
+
+
+### Animals Adopted per Type
+Now for the last section of the analysis we will see what kind of animals are mostly adopted.
+
+```{r}
+# Filter for adopted animals
+adopted_animals <- joined1 %>%
+  filter(outcome_type == "Adoption") %>%
+  group_by(animal_type) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+adopted_animals
+```
+
+We can visualize the data with the next plot: 
+```{r}
+#| label: fig-CountByType
+#| fig-cap: "Count of Adopted Animals by Animal Type"
+
+
+# Plot the data as a bar plot
+ggplot(adopted_animals, aes(x = animal_type, y = count, fill = animal_type)) +
+  geom_col() +  # Use geom_col() to create a column plot
+  labs(
+    x = "Animal Type",
+    y = "Count of Adopted Animals",
+    title = "Count of Adopted Animals by Animal Type",
+    fill = "Type of Animal"
+  ) +
+  theme_gray() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The table and the plot [-@fig-CountByType] represent the number of animals adopted from the shelter, categorized by their type. The data is summarized as follows:
+
+**Dogs**: With a total of 37,173 adoptions, dogs are the most frequently adopted type of animal from the shelter. This high number indicates a strong preference for dogs among those adopting pets.
+
+**Cats**: Following closely behind, cats account for 29,937 adoptions. This suggests that while dogs are slightly more popular, cats are also highly favored as companion animals.
+
+**Other Animals**: This category includes animals that do not fall under the common pet types and has a total of 882 adoptions. These animals are less frequently adopted, possibly due to their specific care requirements or less common presence in the shelter.
+
+**Birds**: With 297 adoptions, birds represent a smaller segment of the adopted animals. Birds may require specialized care, which could contribute to their lower adoption numbers compared to dogs and cats.
+
+**Livestock**: This category has the fewest adoptions, with only 13 animals. Livestock are likely adopted by individuals or organizations with the capacity to house and care for these types of animals, which is less common among typical pet adopters.
+
+Overall, this data provides insight into the adoption preferences and trends at the shelter, highlighting the predominance of dogs and cats as the most adopted animals.
+
+
+## Discussion
+
+The analysis of shelter data provides a comprehensive overview of the intake and outcome processes for animals. Offering valuable insights into their welfare and treatment in the shelter. Initially, we explored the intake conditions of animals, revealing that a significant number of animals were taken in due to being stray or having various health conditions. This information underscores the critical role shelters play in rescuing and providing care for vulnerable animals.
+
+Next we saw that the outcomes of these animals highlighted important patterns. While a substantial proportion of the animals were adopted, transferred, or returned to their owners, the data also revealed a concerning number of euthanasias. Going deeper into the reasons for euthanasia, it became evident that medical conditions, suffering, and rabies risk were predominant factors. This highlights the shelter's challenge in balancing animal welfare with public health and resource constraints.
+
+The comparison between cats and dogs in terms of euthanasia reasons showed that both species faced similar issues. Suffering and medical conditions were primary reasons for euthanasia. However, dogs had a slightly higher count in behavioral and aggression-related euthanasias. This reflects the additional challenges in managing canine behavior in a shelter environment.
+
+At the end we saw that Dogs were the most commonly adopted animals, followed closely by cats. This reflects societal preferences and the strong bond humans have with these pets. The lower adoption rates for other animals, birds, and livestock suggest a need for targeted adoption programs. As well as education to promote the benefits of adopting these less common pets.
+
+
+
+## Conclussion
+
+To conclude, this project analyzed shelter operations, focusing on animal intake conditions, outcomes, and adoption patterns. The findings highlight the shelter's crucial role in rescuing and caring for animals while managing health issues and facilitating adoptions.
+
+Also, data-driven insights can help improve animal welfare, boost adoption rates, and reduce euthanasia. Understanding intake conditions and outcomes allows for targeted interventions to address health issues, enhance training programs, and promote the adoption of less common pets.
+
+```{bibliography}
